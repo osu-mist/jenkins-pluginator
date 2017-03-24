@@ -1,0 +1,7 @@
+# Format 'plugin: "verison"'
+# Not specifying a version or specifying Null will install the latest version
+plugins:
+  git: "2.5.0"
+  hipchat: "1.0.0"
+  publish-over-ssh: "1.14"
+  jira: Null
