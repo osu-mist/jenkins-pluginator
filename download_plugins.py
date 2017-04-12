@@ -6,7 +6,14 @@ def get_dependencies(plugin):
     print "*****************************************"
     print plugin, "has these dependencies:"
 
-    for dependency in plugins_list['plugins'][plugin]['dependencies']:
+    try:
+        dependencies = plugins_list['plugins'][plugin]['dependencies']
+    except KeyError:
+        print "Unable to find dependencies for %s." % plugin
+        exit_code = 1
+        return None
+    
+    for dependency in dependencies:
         print "Processing dependency: " + dependency['name']
         
         if (dependency['name'] not in installed_plugins) and (not dependency['optional']):
