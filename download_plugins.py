@@ -10,6 +10,7 @@ def get_dependencies(plugin):
         dependencies = plugins_list['plugins'][plugin]['dependencies']
     except KeyError:
         print "Unable to find dependencies for %s." % plugin
+        global exit_code
         exit_code = 1
         return None
     
@@ -50,6 +51,7 @@ def download_plugin(plugin, version = None):
     else:
         print "Error downloading %s. Response:" % plugin
         print plugin_download.text
+        global exit_code
         exit_code = 1
 
     installed_plugins.append(plugin)
