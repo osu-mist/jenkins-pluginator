@@ -1,8 +1,9 @@
 import requests, yaml, sys
+from distutils.version import LooseVersion
 
 # Get dependencies for a plugin, or get depedencies for a dependency.
 def get_dependencies(plugin):
-    print "Download dependencies for:", plugin
+    print "Finding dependencies for:", plugin
     print "*****************************************"
     print plugin, "has these dependencies:"
 
@@ -16,17 +17,15 @@ def get_dependencies(plugin):
     
     for dependency in dependencies:
         print "Processing dependency: " + dependency['name']
-        
-        if (dependency['name'] not in installed_plugins) and (not dependency['optional']):
-            print "installing " + dependency['name']
 
-            download_plugin(dependency['name'])
-            get_dependencies(dependency['name'])
-        else:
-            if dependency['optional']:
+        if dependency['optional']:
                 print dependency['name'] + " is optional"
-            else: 
-                print dependency['name'] + " already downloaded"
+        elif ((dependency['name'] in stored_plugins)
+        and (LooseVersion(dependency['version']) <= LooseVersion(stored_plugins[dependency['name']]))):
+            print "Dependency already found"
+        else:
+            print "Adding dependency " + dependency['name']
+            stored_plugins[dependency['name']] = dependency['version']
 
 # Download plugin from jenkins update server. If no version is specified, latest plugin is downloaded.
 def download_plugin(plugin, version = None):
@@ -54,14 +53,17 @@ def download_plugin(plugin, version = None):
         global exit_code
         exit_code = 1
 
-    installed_plugins.append(plugin)
-
 # Install each plugin in the supplied json file along with dependencies.
 def install_plugins():
     for plugin, version in plugins.items():
         print "**** Install Plugin: %s ****" % plugin
         download_plugin(plugin, version)
         get_dependencies(plugin)
+
+    for plugin, version in stored_plugins.items():
+        print "Installing " + plugin
+        download_plugin(plugin, version)
+
 
 plugins_file_path = str(sys.argv[1])
 download_directory = str(sys.argv[2])
@@ -74,7 +76,7 @@ except (IOError, ValueError):
     sys.exit(1)
 
 plugin_base_url = "https://updates.jenkins.io"
-installed_plugins = []
+stored_plugins = {}
 
 plugins_list_request = requests.get(plugin_base_url + "/current/update-center.actual.json")
 
