@@ -20,9 +20,16 @@ def get_dependencies(plugin):
 
         if dependency['optional']:
                 print dependency['name'] + " is optional"
-        elif ((dependency['name'] in stored_plugins)
-        and (LooseVersion(dependency['version']) <= LooseVersion(stored_plugins[dependency['name']]))):
-            print "Dependency already found"
+
+        elif (dependency['name'] in stored_plugins):
+            if (LooseVersion(dependency['version']) <= LooseVersion(stored_plugins[dependency['name']])):
+                print "Newer or same version of dependency already added"
+            else:
+                print "Adding new version of dependency"
+                stored_plugins[dependency['name']] = dependency['version']
+            if dependency['name'] not in multi_version_plugins:
+                    multi_version_plugins.append(dependency['name'])
+                    
         else:
             print "Adding dependency " + dependency['name']
             stored_plugins[dependency['name']] = dependency['version']
@@ -60,10 +67,15 @@ def install_plugins():
         download_plugin(plugin, version)
         get_dependencies(plugin)
 
+    print "Installing all dependencies"
+    print "*****************************************"
     for plugin, version in stored_plugins.items():
-        print "Installing " + plugin
         download_plugin(plugin, version)
 
+    if (multi_version_plugins):
+        for plugin in multi_version_plugins:
+            print "Warning: Multiple versions of %s found in dependencies." % plugin
+            print "Version %s downloaded." % stored_plugins[plugin]
 
 plugins_file_path = str(sys.argv[1])
 download_directory = str(sys.argv[2])
@@ -77,6 +89,7 @@ except (IOError, ValueError):
 
 plugin_base_url = "https://updates.jenkins.io"
 stored_plugins = {}
+multi_version_plugins = []
 
 plugins_list_request = requests.get(plugin_base_url + "/current/update-center.actual.json")
 
