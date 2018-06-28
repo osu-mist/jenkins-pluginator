@@ -16,8 +16,8 @@ python3 download_plugins.py jenkins_plugins.yaml /path/to/download/directory
 ### Docker Method
 Build an image and run the container:
 ```
-docker build -t jenkins-pluginator .
-docker run --rm \
+$ docker build -t jenkins-pluginator .
+$ docker run --rm \
     -v "$PWD"/jenkins_plugins.yaml:/usr/src/app/jenkins_plugins.yaml:ro \
     -v /path/to/download/directory:/usr/src/app/jenkins_plugins \
     jenkins-pluginator
