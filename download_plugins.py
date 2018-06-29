@@ -1,34 +1,30 @@
 import requests
 import yaml
 import sys
+from textwrap import dedent
 from distutils.version import LooseVersion
 
 
 # Get dependencies for a plugin, or get depedencies for a dependency.
 def get_dependencies(plugin):
-    print("""Finding dependencies for: {plugin}
-*****************************************
-{plugin} has these dependencies:""".format(plugin=plugin))
+    print(dedent("""
+    Finding dependencies for: {0}
+    ******************************************
+    {0} has these dependencies:""".format(plugin)))
 
     try:
         dependencies = plugins_list["plugins"][plugin]["dependencies"]
     except KeyError:
-        print("Unable to find dependencies for {plugin}.".format(
-            plugin=plugin
-        ))
+        print("Unable to find dependencies for {}.".format(plugin))
         global exit_code
         exit_code = 1
         return None
 
     for dependency in dependencies:
-        print("Processing dependency: {dependency}".format(
-            dependency=dependency["name"]
-        ))
+        print("Processing dependency: {}".format(dependency["name"]))
 
         if dependency["optional"]:
-                print("{dependency} is optional".format(
-                    dependency=dependency["name"]
-                ))
+                print("{} is optional".format(dependency["name"]))
                 continue
 
         elif dependency["name"] in stored_plugins:
@@ -38,14 +34,14 @@ def get_dependencies(plugin):
             else:
                 print("Adding new version of dependency")
                 stored_plugins[dependency["name"]] = dependency["version"]
+                get_dependencies(dependency["name"])
             if dependency["name"] not in multi_version_plugins:
                     multi_version_plugins.append(dependency["name"])
 
         else:
-            print("Adding dependency: {dependency}".format(
-                dependency=dependency["name"])
-            )
+            print("Adding dependency: {}".format(dependency["name"]))
             stored_plugins[dependency["name"]] = dependency["version"]
+            get_dependencies(dependency["name"])
 
 
 # Download plugin from jenkins update server.
@@ -55,7 +51,7 @@ def download_plugin(plugin, version=None):
 
     if version is None:
         download_url = (plugin_base_url +
-                        "/latest/{plugin}.hpi".format(plugin=plugin))
+                        "/latest/{}.hpi".format(plugin))
     else:
         download_url = (plugin_base_url +
                         "/download/plugins/" +
@@ -75,7 +71,7 @@ def download_plugin(plugin, version=None):
         print("Downloaded", plugin)
 
     else:
-        print("Error downloading {plugin}. Response:".format(plugin=plugin))
+        print("Error downloading {}. Response:".format(plugin))
         print(plugin_download.text)
         global exit_code
         exit_code = 1
@@ -84,22 +80,24 @@ def download_plugin(plugin, version=None):
 # Install each plugin in the supplied json file along with dependencies.
 def install_plugins():
     for plugin, version in plugins.items():
-        print("**** Install Plugin: {plugin} ****".format(plugin=plugin))
+        print("\n**** Install Plugin: {} *****".format(plugin))
         download_plugin(plugin, version)
         get_dependencies(plugin)
 
-    print("Installing all dependencies")
+    print("\nDownloading all dependencies")
     print("*****************************************")
     for plugin, version in stored_plugins.items():
         download_plugin(plugin, version)
 
     if multi_version_plugins:
         for plugin in multi_version_plugins:
-            print("Warning: Multiple versions of {plugin} " +
-                  "found in dependencies.".format(plugin=plugin))
-            print("Version {version} downloaded".format(
-                version=stored_plugins[plugin]
-            ))
+            print(dedent("""\
+            Warning: Multiple versions of {plugin} found in dependencies.
+                Version {version} downloaded\
+            """.format(plugin=plugin, version=stored_plugins[plugin])))
+            # print("Warning: Multiple versions of {} " +
+            #       "found in dependencies.".format(plugin))
+            # print("Version {} downloaded".format(stored_plugins[plugin]))
 
 plugins_file_path = str(sys.argv[1])
 download_directory = str(sys.argv[2])
