@@ -104,14 +104,14 @@ def install_plugins():
         for plugin in multi_version_plugins:
             if(len(multi_version_plugins[plugin]) < 2):
                 continue
-            print(dedent("""
+            print(dedent("""\
             Warning: Multiple versions of {} found in dependencies.\
             """.format(plugin)))
             for entry in multi_version_plugins[plugin]:
-                print("Plugin {plugin} requires version {version}".format(
+                print("    Plugin {plugin} requires version {version}".format(
                     version=entry[0], plugin=entry[1]
                 ))
-            print("Downloaded version {}".format(stored_plugins[plugin]))
+            print("    Downloaded version {}".format(stored_plugins[plugin]))
 
 
 plugins_file_path = str(sys.argv[1])
