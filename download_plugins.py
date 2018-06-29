@@ -3,6 +3,7 @@ import yaml
 import sys
 from textwrap import dedent
 from distutils.version import LooseVersion
+from collections import defaultdict
 
 
 # Get dependencies for a plugin, or get depedencies for a dependency.
@@ -24,8 +25,8 @@ def get_dependencies(plugin):
         print("Processing dependency: {}".format(dependency["name"]))
 
         if dependency["optional"]:
-                print("{} is optional".format(dependency["name"]))
-                continue
+            print("{} is optional".format(dependency["name"]))
+            continue
 
         elif dependency["name"] in stored_plugins:
             if (LooseVersion(dependency["version"]) <=
@@ -35,13 +36,19 @@ def get_dependencies(plugin):
                 print("Adding new version of dependency")
                 stored_plugins[dependency["name"]] = dependency["version"]
                 get_dependencies(dependency["name"])
-            if dependency["name"] not in multi_version_plugins:
-                    multi_version_plugins.append(dependency["name"])
+            if not ([item for item in multi_version_plugins[dependency["name"]]
+                    if item[0] == dependency["version"]]):
+                multi_version_plugins[dependency["name"]].append(
+                    (dependency["version"], plugin)
+                )
 
         else:
             print("Adding dependency: {}".format(dependency["name"]))
             stored_plugins[dependency["name"]] = dependency["version"]
             get_dependencies(dependency["name"])
+            multi_version_plugins[dependency["name"]].append(
+                (dependency["version"], plugin)
+            )
 
 
 # Download plugin from jenkins update server.
@@ -50,8 +57,9 @@ def download_plugin(plugin, version=None):
     download_url = ""
 
     if version is None:
-        download_url = (plugin_base_url +
-                        "/latest/{}.hpi".format(plugin))
+        download_url = "{url}/latest/{plugin}.hpi".format(
+            url=plugin_base_url, plugin=plugin
+        )
     else:
         download_url = (plugin_base_url +
                         "/download/plugins/" +
@@ -62,17 +70,20 @@ def download_plugin(plugin, version=None):
     plugin_download = requests.get(download_url, stream=True)
 
     if plugin_download.status_code == 200:
-        destination_path = download_directory + "/" + plugin + ".hpi"
+        destination_path = "{dir}/{plugin}.hpi".format(
+            dir=download_directory, plugin=plugin
+        )
 
         with open(destination_path, "wb") as data:
             for chunk in plugin_download.iter_content(chunk_size=128):
                 data.write(chunk)
 
-        print("Downloaded", plugin)
+        print("Downloaded {}".format(plugin))
 
     else:
-        print("Error downloading {}. Response:".format(plugin))
-        print(plugin_download.text)
+        print("Error downloading {plugin}. Response:\n{response}".format(
+            plugin=plugin, response=plugin_download.text
+        ))
         global exit_code
         exit_code = 1
 
@@ -91,13 +102,17 @@ def install_plugins():
 
     if multi_version_plugins:
         for plugin in multi_version_plugins:
-            print(dedent("""\
-            Warning: Multiple versions of {plugin} found in dependencies.
-                Version {version} downloaded\
-            """.format(plugin=plugin, version=stored_plugins[plugin])))
-            # print("Warning: Multiple versions of {} " +
-            #       "found in dependencies.".format(plugin))
-            # print("Version {} downloaded".format(stored_plugins[plugin]))
+            if(len(multi_version_plugins[plugin]) < 2):
+                continue
+            print(dedent("""
+            Warning: Multiple versions of {} found in dependencies.\
+            """.format(plugin)))
+            for entry in multi_version_plugins[plugin]:
+                print("Plugin {plugin} requires version {version}".format(
+                    version=entry[0], plugin=entry[1]
+                ))
+            print("Downloaded version {}".format(stored_plugins[plugin]))
+
 
 plugins_file_path = str(sys.argv[1])
 download_directory = str(sys.argv[2])
@@ -106,20 +121,19 @@ try:
     with open(plugins_file_path, "r") as file:
         plugins = yaml.load(file)["plugins"]
 except (IOError, ValueError):
-    print("Unable to load plugin yaml file")
-    sys.exit(1)
+    sys.exit("Unable to load plugin yaml file")
 
 plugin_base_url = "https://updates.jenkins.io"
 stored_plugins = {}
-multi_version_plugins = []
+multi_version_plugins = defaultdict(list)
 
 plugins_list_request = requests.get(plugin_base_url +
                                     "/current/update-center.actual.json")
 
 if plugins_list_request.status_code != 200:
-    print("Unable to get plugin data. Response:")
-    print(plugins_list_request.text)
-    sys.exit(1)
+    sys.exit("Unable to get plugin data. Response:\n{}".format(
+        plugins_list_request.text
+    ))
 
 plugins_list = plugins_list_request.json()
 exit_code = 0

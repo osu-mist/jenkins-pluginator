@@ -10,7 +10,7 @@ Install the required libraries given in [requirements.txt](requirements.txt).
 
 Run the script:
 ```
-python3 download_plugins.py jenkins_plugins.yaml /path/to/download/directory
+$ python3 download_plugins.py jenkins_plugins.yaml /path/to/download/directory
 ```
 
 ### Docker Method
