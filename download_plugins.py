@@ -103,7 +103,7 @@ plugins_file_path = str(sys.argv[1])
 download_directory = str(sys.argv[2])
 
 try:
-    with open(plugins_file_path, 'r') as file:
+    with open(plugins_file_path, "r") as file:
         plugins = yaml.load(file)["plugins"]
 except (IOError, ValueError):
     print("Unable to load plugin yaml file")
