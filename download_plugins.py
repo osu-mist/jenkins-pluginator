@@ -3,7 +3,6 @@ import yaml
 import sys
 from textwrap import dedent
 from distutils.version import LooseVersion
-from collections import defaultdict
 
 
 # Get dependencies for a plugin, or get depedencies for a dependency.
@@ -36,19 +35,21 @@ def get_dependencies(plugin):
                 print("Adding new version of dependency")
                 stored_plugins[dependency["name"]] = dependency["version"]
                 get_dependencies(dependency["name"])
-            if not ([item for item in multi_version_plugins[dependency["name"]]
-                    if item[0] == dependency["version"]]):
-                multi_version_plugins[dependency["name"]].append(
-                    (dependency["version"], plugin)
-                )
+            if not (any(p.get(dependency["version"], None) == plugin for p in
+                    dependencies_info[dependency["name"]]["parents"])):
+                version_sorted_insert(dependency, plugin)
 
         else:
             print("Adding dependency: {}".format(dependency["name"]))
             stored_plugins[dependency["name"]] = dependency["version"]
-            get_dependencies(dependency["name"])
-            multi_version_plugins[dependency["name"]].append(
-                (dependency["version"], plugin)
+            dependencies_info[dependency["name"]] = {
+                "duplicate": False,
+                "parents": []
+            }
+            dependencies_info[dependency["name"]]["parents"].append(
+                {dependency["version"]: plugin}
             )
+            get_dependencies(dependency["name"])
 
 
 # Download plugin from jenkins update server.
@@ -100,18 +101,38 @@ def install_plugins():
     for plugin, version in stored_plugins.items():
         download_plugin(plugin, version)
 
-    if multi_version_plugins:
-        for plugin in multi_version_plugins:
-            if(len(multi_version_plugins[plugin]) < 2):
-                continue
-            print(dedent("""\
-            Warning: Multiple versions of {} found in dependencies.\
-            """.format(plugin)))
-            for entry in multi_version_plugins[plugin]:
-                print("    Plugin {plugin} requires version {version}".format(
-                    version=entry[0], plugin=entry[1]
+    for dependency, info in dependencies_info.items():
+        if not (info["duplicate"]):
+            continue
+        print(dedent("""\
+        Warning: Multiple versions of {} found in dependencies.\
+        """.format(dependency)))
+        for parent in info["parents"]:
+            for version, plugin in parent.items():
+                print("    Version {version} required by {plugin}".format(
+                    version=version, plugin=plugin
                 ))
-            print("    Downloaded version {}".format(stored_plugins[plugin]))
+        print("    Downloaded version {}".format(stored_plugins[dependency]))
+
+
+# Insert a new dependency parent sorted by version
+def version_sorted_insert(dependency, plugin):
+    for idx, elem in enumerate(
+            dependencies_info[dependency["name"]]["parents"]):
+        for version, parent in elem.items():
+            if (LooseVersion(dependency["version"]) <=
+                    LooseVersion(version)):
+                dependencies_info[dependency["name"]]["parents"].insert(
+                    idx, {dependency["version"]: plugin}
+                )
+                if (LooseVersion(dependency["version"]) <
+                        LooseVersion(version)):
+                    dependencies_info[dependency["name"]]["duplicate"] = True
+                return
+    dependencies_info[dependency["name"]]["parents"].append(
+        {dependency["version"]: plugin}
+    )
+    dependencies_info[dependency["name"]]["duplicate"] = True
 
 
 plugins_file_path = str(sys.argv[1])
@@ -125,7 +146,7 @@ except (IOError, ValueError):
 
 plugin_base_url = "https://updates.jenkins.io"
 stored_plugins = {}
-multi_version_plugins = defaultdict(list)
+dependencies_info = {}
 
 plugins_list_request = requests.get(plugin_base_url +
                                     "/current/update-center.actual.json")
