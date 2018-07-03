@@ -7,11 +7,15 @@ Modify the [example yaml file](jenkins_plugins_example.yaml) to list the desired
 
 ### Regular Method
 Install the required libraries given in [requirements.txt](requirements.txt).
+```
+pip3 install -r requirements.txt
+```
 
 Run the script:
 ```
 $ python3 download_plugins.py jenkins_plugins.yaml /path/to/download/directory
 ```
+Add `-d` or `--debug` to see `DEBUG` logging.
 
 ### Docker Method
 Build an image and run the container:
