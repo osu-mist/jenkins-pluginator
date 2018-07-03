@@ -7,5 +7,13 @@ ENV/
 env.bak/
 venv.bak/
 
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Configuration file
+jenkins_plugins.yaml
+
 # Downloaded Jenkins plugins
 *.hpi
