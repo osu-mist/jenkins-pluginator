@@ -57,9 +57,7 @@ def add_dep(dep_name, dep_version, parent):
 
 # Download plugin from jenkins update server.
 # If no version is specified, latest plugin is downloaded.
-def download_plugin(plugin, version=None):
-    download_url = ""
-
+def download_plugin(plugin, version):
     download_url = ("{url}/download/plugins/"
                     "{plugin}/{version}/{plugin}.hpi".format(
                         url=plugin_base_url, plugin=plugin,
@@ -72,7 +70,6 @@ def download_plugin(plugin, version=None):
         destination_path = "{dir}/{plugin}.hpi".format(
             dir=download_directory, plugin=plugin
         )
-
         with open(destination_path, "wb") as data:
             for chunk in plugin_download.iter_content(chunk_size=128):
                 data.write(chunk)
@@ -92,6 +89,21 @@ def download_plugin(plugin, version=None):
         global exit_code
         exit_code = 1
 
+    if not dep_info[plugin]["duplicate"]:
+        return
+
+    print("    Warning: Multiple versions of {} found in dependencies.".format(
+        plugin
+    ))
+    for parent in dep_info[plugin]["parents"]:
+        for version, parent_name in parent.items():
+            if plugin == parent_name:
+                print("        !! TOP-LEVEL version: {} !!".format(version))
+            else:
+                print("        Version {version} required by {parent}".format(
+                    version=version, parent=parent_name
+                ))
+
 
 # Install each plugin in the supplied json file along with dependencies.
 def install_plugins():
@@ -107,23 +119,8 @@ def install_plugins():
     for plugin, version in stored_plugins.items():
         download_plugin(plugin, version)
 
-    for dependency, info in dep_info.items():
-        if not (info["duplicate"]):
-            continue
-        print(dedent("""\
-        Warning: Multiple versions of {} found in dependencies.\
-        """.format(dependency)))
-        for parent in info["parents"]:
-            for version, plugin in parent.items():
-                if dependency == plugin:
-                    print("    !! TOP-LEVEL version: {} !!".format(version))
-                else:
-                    print("    Version {version} required by {plugin}".format(
-                        version=version, plugin=plugin
-                    ))
-        print("    Downloaded version {}".format(stored_plugins[dependency]))
-
     # Print warning for plugin if downloaded version != specified version
+    print()
     for plugin, version in plugins.items():
         if version != stored_plugins[plugin]:
             print("Warning: TOP-LEVEL version of {plugin} ({spec_ver}) "

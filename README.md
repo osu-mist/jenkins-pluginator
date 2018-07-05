@@ -8,7 +8,7 @@ Modify the [example yaml file](jenkins_plugins_example.yaml) to list the desired
 ### Regular Method
 Install the required libraries given in [requirements.txt](requirements.txt).
 ```
-pip3 install -r requirements.txt
+$ pip3 install -r requirements.txt
 ```
 
 Run the script:
