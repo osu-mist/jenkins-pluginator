@@ -1,88 +1,175 @@
-import requests, yaml, sys
+import utils
+import requests
+import yaml
+import sys
+from logging import debug
+from textwrap import dedent
+from distutils.version import LooseVersion
+
 
 # Get dependencies for a plugin, or get depedencies for a dependency.
 def get_dependencies(plugin):
-    print "Download dependencies for:", plugin
-    print "*****************************************"
-    print plugin, "has these dependencies:"
+    debug(dedent("""
+    Finding dependencies for: {0}
+    ******************************************
+    {0} has these dependencies:""".format(plugin)))
 
     try:
-        dependencies = plugins_list['plugins'][plugin]['dependencies']
+        dependencies = plugins_list["plugins"][plugin]["dependencies"]
     except KeyError:
-        print "Unable to find dependencies for %s." % plugin
+        debug("Unable to find dependencies for {}.".format(plugin))
+        global exit_code
         exit_code = 1
         return None
-    
+
     for dependency in dependencies:
-        print "Processing dependency: " + dependency['name']
-        
-        if (dependency['name'] not in installed_plugins) and (not dependency['optional']):
-            print "installing " + dependency['name']
+        dep_version = dependency["version"]
+        dep_name = dependency["name"]
+        debug("Processing dependency: {}".format(dep_name))
 
-            download_plugin(dependency['name'])
-            get_dependencies(dependency['name'])
+        if dependency["optional"]:
+            debug("{} is optional".format(dep_name))
+            continue
         else:
-            if dependency['optional']:
-                print dependency['name'] + " is optional"
-            else: 
-                print dependency['name'] + " already downloaded"
+            add_dep(dep_name, dep_version, plugin)
 
-# Download plugin from jenkins update server. If no version is specified, latest plugin is downloaded.
-def download_plugin(plugin, version = None):
-    download_url = ""
-    
-    if version is None:
-        download_url = plugin_base_url + "/latest/%s.hpi" % plugin
+
+def add_dep(dep_name, dep_version, parent):
+    if dep_name in stored_plugins:
+        if (utils.not_newer(dep_version, stored_plugins[dep_name])):
+            debug("Newer or same version of dependency already added")
+        else:
+            debug("Adding new version of dependency")
+            stored_plugins[dep_name] = dep_version
+            get_dependencies(dep_name)
+        # Insert dependency entry if not already in dep_info
+        if not (any(p.get(dep_version, None) == parent for p in
+                dep_info[dep_name]["parents"])):
+            version_sorted_insert(dep_name, dep_version, parent)
+
     else:
-        download_url = plugin_base_url + "/download/plugins/%(plugin)s/%(version)s/%(plugin)s.hpi" % {'plugin': plugin, 'version': version}
+        debug("Adding dependency: {}".format(dep_name))
+        stored_plugins[dep_name] = dep_version
+        dep_info[dep_name] = {"duplicate": False, "parents": []}
+        dep_info[dep_name]["parents"].append({dep_version: parent})
+        get_dependencies(dep_name)
+
+
+# Download plugin from jenkins update server.
+# If no version is specified, latest plugin is downloaded.
+def download_plugin(plugin, version):
+    download_url = ("{url}/download/plugins/"
+                    "{plugin}/{version}/{plugin}.hpi".format(
+                        url=plugin_base_url, plugin=plugin,
+                        version=version
+                    ))
 
     plugin_download = requests.get(download_url, stream=True)
 
-    if plugin_download.status_code is 200:
-        destination_path = download_directory + "/" + plugin + ".hpi"
-
-        with open(destination_path, 'wb') as data:
+    if plugin_download.status_code == 200:
+        destination_path = "{dir}/{plugin}.hpi".format(
+            dir=download_directory, plugin=plugin
+        )
+        with open(destination_path, "wb") as data:
             for chunk in plugin_download.iter_content(chunk_size=128):
                 data.write(chunk)
+        if plugin in plugins:
+            print("Downloaded {plugin}: {version} [TOP-LEVEL]".format(
+                plugin=plugin, version=stored_plugins[plugin]
+            ))
+        else:
+            print("Downloaded {plugin}: {version}".format(
+                plugin=plugin, version=stored_plugins[plugin]
+            ))
 
-        print "Downloaded", plugin
-        
     else:
-        print "Error downloading %s. Response:" % plugin
-        print plugin_download.text
+        print("Error downloading {plugin}. Response:\n{response}".format(
+            plugin=plugin, response=plugin_download.text
+        ))
+        global exit_code
         exit_code = 1
 
-    installed_plugins.append(plugin)
+    if not dep_info[plugin]["duplicate"]:
+        return
+
+    print("    Warning: Multiple versions of {} found in dependencies.".format(
+        plugin
+    ))
+    for parent in dep_info[plugin]["parents"]:
+        for version, parent_name in parent.items():
+            if plugin == parent_name:
+                print("        !! TOP-LEVEL version: {} !!".format(version))
+            else:
+                print("        Version {version} required by {parent}".format(
+                    version=version, parent=parent_name
+                ))
+
 
 # Install each plugin in the supplied json file along with dependencies.
 def install_plugins():
     for plugin, version in plugins.items():
-        print "**** Install Plugin: %s ****" % plugin
-        download_plugin(plugin, version)
+        debug("\n**** Add Plugin: {} *****".format(plugin))
+        if version is None:
+            version = plugins_list["plugins"][plugin]["version"]
+        add_dep(plugin, version, plugin)
         get_dependencies(plugin)
 
-plugins_file_path = str(sys.argv[1])
-download_directory = str(sys.argv[2])
+    debug("\nDownloading all dependencies")
+    debug("*****************************************")
+    for plugin, version in stored_plugins.items():
+        download_plugin(plugin, version)
 
-try:
-    with open(plugins_file_path, 'r') as file:
-        plugins = yaml.load(file)['plugins']
-except (IOError, ValueError):
-    print "Unable to load plugin yaml file"
-    sys.exit(1)
+    # Print warning for plugin if downloaded version != specified version
+    print()
+    for plugin, version in plugins.items():
+        if version != stored_plugins[plugin]:
+            print("Warning: TOP-LEVEL version of {plugin} ({spec_ver}) "
+                  "not same as downloaded ({real_ver})".format(
+                    plugin=plugin, spec_ver=version,
+                    real_ver=stored_plugins[plugin]
+                    ))
 
-plugin_base_url = "https://updates.jenkins.io"
-installed_plugins = []
 
-plugins_list_request = requests.get(plugin_base_url + "/current/update-center.actual.json")
+# Insert a new dependency parent sorted by version
+def version_sorted_insert(dep_name, dep_version, plugin):
+    for idx, elem in enumerate(dep_info[dep_name]["parents"]):
+        for version, parent in elem.items():
+            if(utils.not_newer(dep_version, version)):
+                dep_info[dep_name]["parents"].insert(
+                    idx, {dep_version: plugin}
+                )
+                if utils.is_older(dep_version, version):
+                    dep_info[dep_name]["duplicate"] = True
+                return
+    dep_info[dep_name]["parents"].append({dep_version: plugin})
+    dep_info[dep_name]["duplicate"] = True
 
-if plugins_list_request.status_code is not 200:
-    print "Unable to get plugin data. Response:"
-    print plugins_list_request.text
-    sys.exit(1)
 
-plugins_list = plugins_list_request.json()
-exit_code = 0
+if __name__ == "__main__":
+    args = utils.parse_args()
+    plugins_file_path = args.jenkins_plugins_config
+    download_directory = args.download_dir
 
-install_plugins()
-sys.exit(exit_code)
+    try:
+        with open(plugins_file_path, "r") as file:
+            plugins = yaml.load(file)["plugins"]
+    except (IOError, ValueError):
+        sys.exit("Unable to load plugin yaml file")
+
+    plugin_base_url = "https://updates.jenkins.io"
+    stored_plugins = {}
+    dep_info = {}
+
+    plugins_list_request = requests.get(plugin_base_url +
+                                        "/current/update-center.actual.json")
+
+    if plugins_list_request.status_code != 200:
+        sys.exit("Unable to get plugin data. Response:\n{}".format(
+            plugins_list_request.text
+        ))
+
+    plugins_list = plugins_list_request.json()
+    exit_code = 0
+
+    install_plugins()
+    sys.exit(exit_code)

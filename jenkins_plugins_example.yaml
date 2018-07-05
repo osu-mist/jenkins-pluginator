@@ -1,4 +1,4 @@
-# Format 'plugin: "verison"'
+# Format 'plugin: "version"'
 # Not specifying a version or specifying Null will install the latest version
 plugins:
   git: "2.5.0"
