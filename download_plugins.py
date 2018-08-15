@@ -147,10 +147,11 @@ def version_sorted_insert(dep_name, dep_version, plugin):
 
 
 def write_output_file():
+    out_filename = "output.yaml"
     plugins_output = {"plugins": stored_plugins}
-    with open("output.yaml", "w") as outfile:
+    with open(out_filename, "w") as outfile:
         yaml.dump(plugins_output, outfile, default_flow_style=False)
-    print("Plugin information written to output.yaml")
+    print("Plugin information written to {}".format(out_filename))
 
 
 if __name__ == "__main__":
