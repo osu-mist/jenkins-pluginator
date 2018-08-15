@@ -122,7 +122,7 @@ def install_plugins():
     # Print warning for plugin if downloaded version != specified version
     print()
     for plugin, version in plugins.items():
-        if version != stored_plugins[plugin]:
+        if version is not None and version != stored_plugins[plugin]:
             print("Warning: TOP-LEVEL version of {plugin} ({spec_ver}) "
                   "not same as downloaded ({real_ver})".format(
                     plugin=plugin, spec_ver=version,
