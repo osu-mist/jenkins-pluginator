@@ -1,3 +1,4 @@
+import os
 import sys
 from logging import debug
 from textwrap import dedent
@@ -123,7 +124,7 @@ def install_plugins():
     # Print warning for plugin if downloaded version != specified version
     print()
     for plugin, version in plugins.items():
-        if version is not None and version != stored_plugins[plugin]:
+        if version and version != stored_plugins[plugin]:
             print("Warning: TOP-LEVEL version of {plugin} ({spec_ver}) "
                   "not same as downloaded ({real_ver})".format(
                     plugin=plugin, spec_ver=version,
@@ -147,7 +148,7 @@ def version_sorted_insert(dep_name, dep_version, plugin):
 
 
 def write_output_file():
-    out_filename = "output.yaml"
+    out_filename = os.path.join(download_directory, "output.yaml")
     plugins_output = {"plugins": stored_plugins}
     with open(out_filename, "w") as outfile:
         yaml.dump(plugins_output, outfile, default_flow_style=False)
