@@ -2,6 +2,10 @@
 This repository contains a [script](download_plugins.py) that downloads Jenkins plugin (.hpi files). This script downloads
 plugins and required dependencies. This script doesn't install optional dependencies.
 
+A list of plugin-version pairs will be written to `/path/to/download/directory/output.yml`.
+This file documents which plugins were installed and is in the same format as [jenkins_plugins.yaml](jenkins_plugins.yaml)
+This file can also be used in the [jenkins Ansible role](https://github.sig.oregonstate.edu/ecs-data/ansible-private-roles/blob/master/roles/jenkins/vars/main.yml)
+
 ## Usage
 Modify the [example yaml file](jenkins_plugins_example.yaml) to list the desired plugins to be downloaded.
 

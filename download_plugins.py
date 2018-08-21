@@ -147,6 +147,7 @@ def version_sorted_insert(dep_name, dep_version, plugin):
     dep_info[dep_name]["duplicate"] = True
 
 
+# See readme for more information about output.yml
 def write_output_file():
     out_filename = os.path.join(download_directory, "output.yaml")
     plugins_output = {"plugins": stored_plugins}
