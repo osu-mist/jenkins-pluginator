@@ -17,3 +17,6 @@ jenkins_plugins.yaml
 
 # Downloaded Jenkins plugins
 *.hpi
+
+# Output YAML
+output.yaml

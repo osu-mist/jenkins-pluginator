@@ -1,13 +1,15 @@
-import utils
-import requests
-import yaml
+import os
 import sys
 from logging import debug
 from textwrap import dedent
-from distutils.version import LooseVersion
+
+import requests
+import yaml
+
+import utils
 
 
-# Get dependencies for a plugin, or get depedencies for a dependency.
+# Get dependencies for a plugin, or get dependencies for a dependency.
 def get_dependencies(plugin):
     debug(dedent("""
     Finding dependencies for: {0}
@@ -36,7 +38,7 @@ def get_dependencies(plugin):
 
 def add_dep(dep_name, dep_version, parent):
     if dep_name in stored_plugins:
-        if (utils.not_newer(dep_version, stored_plugins[dep_name])):
+        if utils.not_newer(dep_version, stored_plugins[dep_name]):
             debug("Newer or same version of dependency already added")
         else:
             debug("Adding new version of dependency")
@@ -122,7 +124,7 @@ def install_plugins():
     # Print warning for plugin if downloaded version != specified version
     print()
     for plugin, version in plugins.items():
-        if version != stored_plugins[plugin]:
+        if version and version != stored_plugins[plugin]:
             print("Warning: TOP-LEVEL version of {plugin} ({spec_ver}) "
                   "not same as downloaded ({real_ver})".format(
                     plugin=plugin, spec_ver=version,
@@ -134,7 +136,7 @@ def install_plugins():
 def version_sorted_insert(dep_name, dep_version, plugin):
     for idx, elem in enumerate(dep_info[dep_name]["parents"]):
         for version, parent in elem.items():
-            if(utils.not_newer(dep_version, version)):
+            if utils.not_newer(dep_version, version):
                 dep_info[dep_name]["parents"].insert(
                     idx, {dep_version: plugin}
                 )
@@ -143,6 +145,15 @@ def version_sorted_insert(dep_name, dep_version, plugin):
                 return
     dep_info[dep_name]["parents"].append({dep_version: plugin})
     dep_info[dep_name]["duplicate"] = True
+
+
+# See readme for more information about output.yml
+def write_output_file():
+    out_filename = os.path.join(download_directory, "output.yaml")
+    plugins_output = {"plugins": stored_plugins}
+    with open(out_filename, "w") as outfile:
+        yaml.dump(plugins_output, outfile, default_flow_style=False)
+    print("Plugin information written to {}".format(out_filename))
 
 
 if __name__ == "__main__":
@@ -172,4 +183,5 @@ if __name__ == "__main__":
     exit_code = 0
 
     install_plugins()
+    write_output_file()
     sys.exit(exit_code)
