@@ -1,6 +1,5 @@
 import sys
 from logging import debug
-from textwrap import dedent
 
 import requests
 import yaml
@@ -10,24 +9,23 @@ import utils
 
 # Get dependencies for a plugin, or get dependencies for a dependency.
 def get_dependencies(plugin):
-    debug(dedent("""
-    Finding dependencies for: {0}
-    ******************************************
-    {0} has these dependencies:""".format(plugin)))
-
+    debug(f"Finding dependencies for {plugin}\n"
+          f"******************************************\n"
+          f"{plugin} has these dependencies:\n"
+          )
     try:
         dependencies = plugins_list["plugins"][plugin]["dependencies"]
     except KeyError:
-        debug("Unable to find dependencies for {}.".format(plugin))
+        debug(f"Unable to find dependencies for {plugin}.")
         global exit_code
         exit_code = 1
         return None
 
     for dependency in dependencies:
         dep_name = dependency["name"]
-        debug("Processing dependency: {}".format(dep_name))
+        debug(f"Processing dependency: {dep_name}")
         if dependency["optional"]:
-            debug("{} is optional".format(dep_name))
+            debug(f"{dep_name} is optional")
             continue
         download_plugin(dep_name)
         get_dependencies(dep_name)
@@ -37,16 +35,12 @@ def get_dependencies(plugin):
 def download_plugin(plugin):
     if plugin in stored_plugins.keys():
         return
-    download_url = "{url}/latest/{plugin}.hpi".format(
-                        url=plugin_base_url, plugin=plugin
-                    )
+    download_url = f"{plugin_base_url}/latest/{plugin}.hpi"
 
     plugin_download = requests.get(download_url, stream=True)
 
     if plugin_download.status_code == 200:
-        destination_path = "{dir}/{plugin}.hpi".format(
-            dir=download_directory, plugin=plugin
-        )
+        destination_path = f"{download_directory}/{plugin}.hpi"
         with open(destination_path, "wb") as data:
             for chunk in plugin_download.iter_content(chunk_size=128):
                 data.write(chunk)
@@ -55,16 +49,10 @@ def download_plugin(plugin):
         stored_plugins[plugin] = version
 
         status = "top-level" if plugin in plugins else "dependency"
-        print("Downloaded {status} plugin {plugin}: {version}".format(
-            status=status,
-            plugin=plugin,
-            version=version
-        ))
+        print(f"Downloaded {status} plugin {plugin}: {version}")
 
     else:
-        print("Error downloading {plugin}. Response:\n{response}".format(
-            plugin=plugin, response=plugin_download.text
-        ))
+        print(f"Error downloading {plugin}. Response:\n{plugin_download.text}")
         global exit_code
         exit_code = 1
 
@@ -72,7 +60,7 @@ def download_plugin(plugin):
 # Install each plugin in the supplied json file along with dependencies.
 def install_plugins():
     for plugin in plugins.keys():
-        debug("\n**** Add Plugin: {} *****".format(plugin))
+        debug(f"\n**** Add Plugin: {plugin} *****")
         download_plugin(plugin)
         get_dependencies(plugin)
 
@@ -87,7 +75,7 @@ def update_file():
 
     with open(plugins_file_path, "w") as outfile:
         yaml.dump(data, outfile, default_flow_style=False)
-    print("File {} updated".format(plugins_file_path))
+    print(f"File {plugins_file_path} updated")
 
 
 if __name__ == "__main__":
@@ -104,13 +92,14 @@ if __name__ == "__main__":
     plugin_base_url = "https://updates.jenkins.io"
 
     plugins_list_request = requests.get(
-        "{}/current/update-center.actual.json".format(plugin_base_url)
+        f"{plugin_base_url}/current/update-center.actual.json"
     )
 
     if plugins_list_request.status_code != 200:
-        sys.exit("Unable to get plugin data. Response:\n{}".format(
-            plugins_list_request.text
-        ))
+        sys.exit(
+            f"Unable to get plugin data. Response:\n"
+            f"{plugins_list_request.text}"
+        )
 
     plugins_list = plugins_list_request.json()
     exit_code = 0
