@@ -29,12 +29,14 @@ def get_dependencies(plugin):
         if dependency["optional"]:
             debug("{} is optional".format(dep_name))
             continue
-        elif dep_name not in stored_plugins.keys():
-            download_plugin(dep_name)
+        download_plugin(dep_name)
+        get_dependencies(dep_name)
 
 
 # Download latest version of plugin from jenkins update server.
 def download_plugin(plugin):
+    if plugin in stored_plugins.keys():
+        return
     download_url = "{url}/latest/{plugin}.hpi".format(
                         url=plugin_base_url, plugin=plugin
                     )
